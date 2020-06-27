@@ -276,7 +276,6 @@ typename vector<T>::iterator vector<T>::insert(vector::const_iterator pos, const
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator pos) {
     iterator it = (pos - begin()) + begin();
-    iterator ret = it + 1;
     while (it + 1 != end()) {
         std::swap(*it, *(it + 1));
         ++it;
