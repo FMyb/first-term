@@ -17,6 +17,8 @@ struct big_integer {
 
     big_integer(int value);
 
+    big_integer(uint32_t);
+
     big_integer(big_integer const &other) = default;
 
     explicit big_integer(std::string const &str);
