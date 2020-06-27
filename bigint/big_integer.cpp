@@ -1,242 +1,312 @@
-#include "big_integer.h"
+//
+// Created by Yaroslav Ilin, M3138, KT ITMO y2019. 05.05.2020
+//
 
-#include <cstring>
-#include <stdexcept>
+#include "big_integer.h"
+#include <climits>
+#include <algorithm>
+
+big_integer::big_integer(int value)
+{
+    val = std::vector<uint32_t>(1, abs(value));
+    sign = value >= 0 ? 1 : -1;
+}
 
 big_integer::big_integer()
 {
-    mpz_init(mpz);
+    val = std::vector<uint32_t>(1, 0);
+    sign = 1;
 }
 
-big_integer::big_integer(big_integer const& other)
+std::string big_integer::to_string() const
 {
-    mpz_init_set(mpz, other.mpz);
-}
-
-big_integer::big_integer(int a)
-{
-    mpz_init_set_si(mpz, a);
-}
-
-big_integer::big_integer(std::string const& str)
-{
-    if (mpz_init_set_str(mpz, str.c_str(), 10))
-    {
-        mpz_clear(mpz);
-        throw std::runtime_error("invalid string");
+    if (*this == 0) {
+        return "0";
     }
+    std::string ans;
+    big_integer tmp = *this;
+    while (tmp != 0) {
+        ans += char('0' + (tmp % 10).val[0]);
+        tmp /= 10;
+    }
+    if (sign == -1) ans += '-';
+    reverse(ans.begin(), ans.end());
+    return ans;
 }
 
 big_integer::~big_integer()
 {
-    mpz_clear(mpz);
+    val.clear(); // TODO
 }
 
-big_integer& big_integer::operator=(big_integer const& other)
+big_integer::big_integer(const std::string &str)
 {
-    mpz_set(mpz, other.mpz);
+    *this = big_integer(0);
+    if (str == "0") {
+        return;
+    }
+    size_t i = 0;
+    if (str[0] == '-') {
+        sign = -1;
+        i = 1;
+    }
+    for (; i < str.size(); i++) {
+        *this *= 10;
+        *this += str[i] - '0';
+    }
+}
+
+big_integer &big_integer::operator=(const big_integer &other)
+{
+    big_integer tmp(other);
+    swap(tmp);
     return *this;
 }
 
-big_integer& big_integer::operator+=(big_integer const& rhs)
+big_integer &big_integer::operator+=(const big_integer &other)
 {
-    mpz_add(mpz, mpz, rhs.mpz);
+    if (sign == other.sign) {
+        big_integer res;
+        res.val.resize(std::max(size(), other.size()) + 1, 0);
+        long long cur = 0;
+        long long sum = 0;
+        for (int i = 0; i < std::max(size(), other.size()); i++) {
+            sum = cur;
+            if (i < size()) {
+                sum += val[i];
+            }
+            if (i < other.size()) {
+                sum += other.val[i];
+            }
+            cur = sum > UINT32_MAX;
+            res.val[i] = static_cast<uint32_t>(sum % UINT32_MAX);
+        }
+        res.val[std::max(size(), other.size())] = static_cast<uint32_t>(cur);
+        res.sign = sign;
+        res.shrink_to_fit();
+        *this = res;
+    } else {
+        (sign == -1 ? *this = other - (-*this) : *this -= -other);
+    }
     return *this;
 }
 
-big_integer& big_integer::operator-=(big_integer const& rhs)
+big_integer &big_integer::operator-=(const big_integer &other)
 {
-    mpz_sub(mpz, mpz, rhs.mpz);
-    return *this;
-}
-
-big_integer& big_integer::operator*=(big_integer const& rhs)
-{
-    mpz_mul(mpz, mpz, rhs.mpz);
-    return *this;
-}
-
-big_integer& big_integer::operator/=(big_integer const& rhs)
-{
-    mpz_tdiv_q(mpz, mpz, rhs.mpz);
-    return *this;
-}
-
-big_integer& big_integer::operator%=(big_integer const& rhs)
-{
-    mpz_tdiv_r(mpz, mpz, rhs.mpz);
-    return *this;
-}
-
-big_integer& big_integer::operator&=(big_integer const& rhs)
-{
-    mpz_and(mpz, mpz, rhs.mpz);
-    return *this;
-}
-
-big_integer& big_integer::operator|=(big_integer const& rhs)
-{
-    mpz_ior(mpz, mpz, rhs.mpz);
-    return *this;
-}
-
-big_integer& big_integer::operator^=(big_integer const& rhs)
-{
-    mpz_xor(mpz, mpz, rhs.mpz);
-    return *this;
-}
-
-big_integer& big_integer::operator<<=(int rhs)
-{
-    mpz_mul_2exp(mpz, mpz, rhs);
-    return *this;
-}
-
-big_integer& big_integer::operator>>=(int rhs)
-{
-    mpz_div_2exp(mpz, mpz, rhs);
-    return *this;
-}
-
-big_integer big_integer::operator+() const
-{
+    if (sign == other.sign) {
+        long long cur = 0;
+        int b = 0;
+        for (int i = 0; i < std::max(size(), other.size()); i++) {
+            if (i >= size()) {
+                val.push_back(0);
+            }
+            if (i >= other.size()) {
+                b = 0;
+            } else {
+                b = other.val[i];
+            }
+            cur += val[i] - b;
+            val[i] = (cur + INT_MAX) % INT_MAX;
+            cur = ((cur + INT_MAX) / INT_MAX) - 1;
+        }
+        if (cur != 0) {
+            val.push_back(cur);
+            sign = 0 - sign;
+        }
+    } else {
+        *this += -other;
+    }
     return *this;
 }
 
 big_integer big_integer::operator-() const
 {
-    big_integer r;
-    mpz_neg(r.mpz, mpz);
-    return r;
+    big_integer ret(*this);
+    ret.sign = -sign;
+    return ret;
 }
 
-big_integer big_integer::operator~() const
+big_integer big_integer::operator+() const
 {
-    big_integer r;
-    mpz_com(r.mpz, mpz);
-    return r;
+    return big_integer(*this);
 }
 
-big_integer& big_integer::operator++()
+big_integer &big_integer::operator*=(const big_integer &other)
 {
-    mpz_add_ui(mpz, mpz, 1);
+    if (*this == 0 || other == 0) *this = 0;
+    big_integer res;
+    res.val.assign(size() + other.size(), 0);
+    for (size_t i = 0; i < size(); i++) {
+        uint32_t cur = 0;
+        for (size_t j = 0; j < other.size(); j++) {
+            uint64_t temp = (uint64_t) val[i] * other.val[j] + res.val[i + j] + cur;
+            res.val[i + j] = (uint32_t) (temp % (1LL << 32));
+            cur = (uint32_t) (temp >> 32);
+        }
+        res.val[i + other.size()] += cur;
+    }
+    res.sign = sign * other.sign;
+    res.shrink_to_fit();
+    *this = res;
     return *this;
 }
 
-big_integer big_integer::operator++(int)
+big_integer &big_integer::operator<<=(int value)
 {
-    big_integer r = *this;
-    ++*this;
-    return r;
 }
 
-big_integer& big_integer::operator--()
+void big_integer::shrink_to_fit()
 {
-    mpz_sub_ui(mpz, mpz, 1);
+    while (size() > 1 && val.back() == 0) {
+        val.pop_back();
+    }
+}
+
+void big_integer::swap(big_integer &other)
+{
+    std::swap(val, other.val);
+    std::swap(sign, other.sign);
+}
+
+bool operator==(const big_integer &a, const big_integer &b)
+{
+    return a.sign == b.sign && a.val == b.val;
+}
+
+void difference(big_integer &a, big_integer const &b, size_t index) {
+    size_t start = a.size() - index;
+    bool borrow = false;
+    for (size_t i = 0; i < index; ++i) {
+        uint32_t x = a.val[start + i];
+        uint32_t y = (i < b.size() ? b.val[i] : 0);
+        uint64_t c = (int64_t) x - y - borrow;
+        borrow = (y + borrow > x);
+        c %= UINT32_MAX;
+        a.val[start + i] = (uint32_t) c;
+    }
+}
+
+
+big_integer div_bi_short(big_integer &a, uint32_t b)
+{
+    big_integer ans;
+    uint64_t cur = 0;
+    uint64_t temp = 0;
+    for (size_t i = 0; i < a.size(); i++) {
+        temp = (cur << 32) | a.val[a.size() - 1 - i];
+        ans.val.push_back((uint32_t) (temp / b));
+        cur = temp % b;
+    }
+    reverse(ans.val.begin(), ans.val.end());
+    ans.shrink_to_fit();
+    return ans;
+}
+
+bool smaller(big_integer const &a, big_integer const &b, size_t ind) {
+    for (size_t i = 1; i <= a.size(); i++) {
+        uint32_t tmp = ind - i < b.size() ? b.val[ind - i] : 0;
+        if (a.val[a.size() - i] != tmp) {
+            return a.val[a.size() - i] > tmp;
+        }
+    }
+    return true;
+}
+
+
+big_integer &big_integer::operator/=(const big_integer &other)
+{
+    big_integer a = *this;
+    big_integer b = other;
+    big_integer tmp;
+    big_integer x;
+    a.sign = b.sign = false;
+    if (a < b) {
+        *this = 0;
+        return *this;
+    }
+    if (b.size() == 1) {
+        tmp = div_bi_short(a, b.val[0]);
+        tmp.sign = sign * other.sign;
+        *this = tmp;
+        return *this;
+    }
+    a.val.push_back(0);
+    size_t m = b.size() + 1;
+    size_t n = a.size();
+    tmp.val.resize(n - m + 1);
+    uint32_t y = 0;
+    for (size_t i = m, j = tmp.val.size() - 1; i <= n; ++i, --j) {
+        uint128_t x = (((uint128_t) a.val[a.size() - 1] << 64) |
+                       ((uint128_t) a.val[a.size() - 2] << 32) |
+                       ((uint128_t) a.val[a.size() - 3]));
+        uint128_t y = (((uint128_t) b.val[b.size() - 1] << 32) |
+                       (uint128_t) b.val[b.size() - 2]);
+        y = std::min((uint32_t) (x / y), UINT32_MAX);
+        x = b * y;
+        if (!smaller(a, x, m)) {
+            y--;
+            x -= b;
+        }
+        tmp.val[j] = y;
+        difference(a, x, m);
+        if (!a.val.back()) a.val.pop_back();
+    }
+    tmp.shrink_to_fit();
+    tmp.sign = sign * other.sign;
+    *this = tmp;
     return *this;
 }
 
-big_integer big_integer::operator--(int)
+bool operator!=(const big_integer & a, const big_integer & b)
 {
-    big_integer r = *this;
-    --*this;
-    return r;
+    return ! (a == b);
 }
 
-big_integer operator+(big_integer a, big_integer const& b)
+
+std::ostream &operator<<(std::ostream &os, big_integer const &other)
+{
+    os << other.to_string();
+    return os;
+}
+
+big_integer operator+(big_integer a, const big_integer &b)
 {
     return a += b;
 }
 
-big_integer operator-(big_integer a, big_integer const& b)
+big_integer operator-(big_integer a, const big_integer &b)
 {
     return a -= b;
 }
 
-big_integer operator*(big_integer a, big_integer const& b)
+big_integer operator*(big_integer a, const big_integer &b)
 {
     return a *= b;
 }
 
-big_integer operator/(big_integer a, big_integer const& b)
+big_integer operator>>(big_integer a, int value)
 {
-    return a /= b;
+    for (size_t i = 0; i < value; i++) {
+        a /= 2;
+    }
+    return a;
 }
 
-big_integer operator%(big_integer a, big_integer const& b)
+big_integer operator<<(big_integer a, int value)
 {
-    return a %= b;
+    for (size_t i = 0; i < value; i++) {
+        a *= 2;
+    }
+    return a;
 }
 
-big_integer operator&(big_integer a, big_integer const& b)
+big_integer operator%(big_integer a, const big_integer &b)
 {
-    return a &= b;
+    return a - ((a / b) * b);
 }
 
-big_integer operator|(big_integer a, big_integer const& b)
+big_integer operator/(big_integer a, const big_integer &b)
 {
-    return a |= b;
-}
-
-big_integer operator^(big_integer a, big_integer const& b)
-{
-    return a ^= b;
-}
-
-big_integer operator<<(big_integer a, int b)
-{
-    return a <<= b;
-}
-
-big_integer operator>>(big_integer a, int b)
-{
-    return a >>= b;
-}
-
-bool operator==(big_integer const& a, big_integer const& b)
-{
-    return mpz_cmp(a.mpz, b.mpz) == 0;
-}
-
-bool operator!=(big_integer const& a, big_integer const& b)
-{
-    return mpz_cmp(a.mpz, b.mpz) != 0;
-}
-
-bool operator<(big_integer const& a, big_integer const& b)
-{
-    return mpz_cmp(a.mpz, b.mpz) < 0;
-}
-
-bool operator>(big_integer const& a, big_integer const& b)
-{
-    return mpz_cmp(a.mpz, b.mpz) > 0;
-}
-
-bool operator<=(big_integer const& a, big_integer const& b)
-{
-    return mpz_cmp(a.mpz, b.mpz) <= 0;
-}
-
-bool operator>=(big_integer const& a, big_integer const& b)
-{
-    return mpz_cmp(a.mpz, b.mpz) >= 0;
-}
-
-std::string to_string(big_integer const& a)
-{
-    char* tmp = mpz_get_str(NULL, 10, a.mpz);
-    std::string res = tmp;
-
-    void (*freefunc)(void*, size_t);
-    mp_get_memory_functions (NULL, NULL, &freefunc);
-
-    freefunc(tmp, strlen(tmp) + 1);
-
-    return res;
-}
-
-std::ostream& operator<<(std::ostream& s, big_integer const& a)
-{
-    return s << to_string(a);
+    a /= b;
+    return a;
 }
