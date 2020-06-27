@@ -73,23 +73,31 @@ struct big_integer {
 
     friend bool operator>=(big_integer const &, big_integer const &);
 
+    friend big_integer operator<<(big_integer a, int value);
+
+    friend big_integer operator>>(big_integer a, int value);
+
     std::string to_string() const;
 
 private:
+
     void swap(big_integer &other);
 
     void shrink_to_fit();
 
     friend big_integer div_bi_short(big_integer &, uint32_t);
 
-    size_t size() const
-    {
-        return val.size();
-    }
-
-    friend void difference(big_integer  &, big_integer const &, size_t);
+    friend void difference(big_integer &, big_integer const &, size_t);
 
     friend bool smaller(big_integer const &, big_integer const &, size_t);
+
+    friend big_integer b_op(big_integer const &, big_integer const &, uint32_t (*f)(uint32_t, uint32_t));
+
+    void add_up(size_t);
+
+    size_t size() const {
+        return val.size();
+    }
 
 private:
     std::vector<uint32_t> val;
@@ -111,10 +119,6 @@ big_integer operator&(big_integer a, big_integer const &b);
 big_integer operator|(big_integer a, big_integer const &b);
 
 big_integer operator^(big_integer a, big_integer const &b);
-
-big_integer operator>>(big_integer a, int value);
-
-big_integer operator<<(big_integer a, int value);
 
 std::ostream &operator<<(std::ostream &os, big_integer const &other);
 
