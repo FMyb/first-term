@@ -7,7 +7,17 @@
 #include <algorithm>
 
 big_integer::big_integer(int value) {
-    val = std::vector<uint32_t>(1, abs(value));
+    uint32_t tmp;
+    if (value < 0) {
+        if (value == INT_MIN) {
+            tmp = static_cast<uint32_t>(INT_MAX) + 1;
+        } else {
+            tmp = -value;
+        }
+    } else {
+        tmp = value;
+    }
+    val = std::vector<uint32_t>(1, tmp);
     sign = value >= 0 ? 1 : -1;
 }
 
@@ -21,20 +31,6 @@ big_integer::big_integer() {
     sign = 1;
 }
 
-std::string big_integer::to_string() const {
-    if (*this == 0) {
-        return "0";
-    }
-    std::string ans;
-    big_integer tmp = *this;
-    while (tmp != 0) {
-        ans += char('0' + (tmp % 10).val[0]);
-        tmp /= 10;
-    }
-    if (sign == -1) ans += '-';
-    reverse(ans.begin(), ans.end());
-    return ans;
-}
 
 big_integer::~big_integer() {
     val.clear(); // TODO
@@ -76,8 +72,8 @@ big_integer &big_integer::operator+=(const big_integer &other) {
             if (i < other.size()) {
                 sum += other.val[i];
             }
-            cur = sum > UINT32_MAX;
-            res.val[i] = static_cast<uint32_t>(sum % UINT32_MAX);
+            cur = sum / (1LL << 32);
+            res.val[i] = static_cast<uint32_t>(sum % (1LL << 32));
         }
         res.val[std::max(size(), other.size())] = static_cast<uint32_t>(cur);
         res.sign = sign;
@@ -90,9 +86,13 @@ big_integer &big_integer::operator+=(const big_integer &other) {
 }
 
 big_integer &big_integer::operator-=(const big_integer &other) {
-    if (sign == other.sign) {
+    if (other.sign == 1) {
+        if (*this < other) {
+            *this = -(other - *this);
+            return *this;
+        }
         long long cur = 0;
-        int b = 0;
+        long long b = 0;
         for (size_t i = 0; i < std::max(size(), other.size()); i++) {
             if (i >= size()) {
                 val.push_back(0);
@@ -100,11 +100,11 @@ big_integer &big_integer::operator-=(const big_integer &other) {
             if (i >= other.size()) {
                 b = 0;
             } else {
-                b = other.val[i];
+                b = 1LL * other.val[i];
             }
-            cur += val[i] - b;
-            val[i] = (cur + INT_MAX) % INT_MAX;
-            cur = ((cur + INT_MAX) / INT_MAX) - 1;
+            cur += 1LL * val[i] - b;
+            val[i] = static_cast<uint32_t>((cur + (1LL << 32)) % (1LL << 32));
+            cur = ((cur + (1LL << 32)) / (1LL << 32)) - 1;
         }
         if (cur != 0) {
             val.push_back(cur);
@@ -117,6 +117,9 @@ big_integer &big_integer::operator-=(const big_integer &other) {
 }
 
 big_integer big_integer::operator-() const {
+    if (*this == 0) {
+        return *this;
+    }
     big_integer ret(*this);
     ret.sign = -sign;
     return ret;
@@ -135,7 +138,7 @@ big_integer &big_integer::operator*=(const big_integer &other) {
         for (size_t j = 0; j < other.size(); j++) {
             uint64_t temp = (uint64_t) val[i] * other.val[j] + res.val[i + j] + cur;
             res.val[i + j] = static_cast<uint32_t> ((temp % (1LL << 32)));
-            cur = static_cast<uint32_t> ((temp >> 32));
+            cur = static_cast<uint32_t> (temp / (1LL << 32));
         }
         res.val[i + other.size()] += cur;
     }
@@ -162,7 +165,11 @@ void big_integer::swap(big_integer &other) {
 }
 
 bool operator==(const big_integer &a, const big_integer &b) {
-    return a.sign == b.sign && a.val == b.val;
+    if (a.sign == b.sign) {
+        return a.val == b.val;
+    } else {
+        return a.size() == 1 && a.val[0] == 0 && b.size() == 1 && b.val[0] == 0;
+    }
 }
 
 
@@ -174,7 +181,7 @@ void difference(big_integer &a, big_integer const &b, size_t index) {
         uint32_t y = (i < b.size() ? b.val[i] : 0);
         uint64_t c = static_cast<uint64_t> (x - y - borrow);
         borrow = (y + borrow > x);
-        c %= UINT32_MAX;
+        c %= (1LL << 32);
         a.val[start + i] = static_cast<uint32_t> (c);
     }
 }
@@ -226,10 +233,10 @@ big_integer &big_integer::operator/=(const big_integer &other) {
     tmp.val.resize(n - m + 1);
     uint32_t qt = 0;
     for (size_t i = m, j = tmp.val.size() - 1; i <= n; ++i, --j) {
-        uint128_t x = ((static_cast<uint128_t> (a.val[a.size() - 1] << 64)) |
-                       (static_cast<uint128_t> (a.val[a.size() - 2] << 32)) |
+        uint128_t x = ((static_cast<uint128_t> (a.val[a.size() - 1]) << 64) |
+                       (static_cast<uint128_t> (a.val[a.size() - 2]) << 32) |
                        (static_cast<uint128_t> (a.val[a.size() - 3])));
-        uint128_t y = ((static_cast<uint128_t> (b.val[b.size() - 1] << 32)) |
+        uint128_t y = ((static_cast<uint128_t> (b.val[b.size() - 1]) << 32) |
                        static_cast<uint128_t> (b.val[b.size() - 2]));
         qt = std::min(static_cast<uint32_t> ((x / y)), UINT32_MAX);
         dq = b * qt;
@@ -387,7 +394,7 @@ big_integer operator^(big_integer a, const big_integer &b) {
 }
 
 std::ostream &operator<<(std::ostream &os, big_integer const &other) {
-    os << other.to_string();
+    os << to_string(other);
     return os;
 }
 
@@ -430,4 +437,19 @@ big_integer operator%(big_integer a, const big_integer &b) {
 big_integer operator/(big_integer a, const big_integer &b) {
     a /= b;
     return a;
+}
+
+std::string to_string(const big_integer &a) {
+    if (a == 0) {
+        return "0";
+    }
+    std::string ans;
+    big_integer tmp = a;
+    while (tmp != 0) {
+        ans += char('0' + (tmp % 10).val[0]);
+        tmp /= 10;
+    }
+    if (a.sign == -1) ans += '-';
+    reverse(ans.begin(), ans.end());
+    return ans;
 }

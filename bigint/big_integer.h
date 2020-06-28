@@ -77,7 +77,7 @@ struct big_integer {
 
     friend big_integer operator>>(big_integer a, int value);
 
-    std::string to_string() const;
+    friend std::string to_string(big_integer const& a);
 
 private:
 
