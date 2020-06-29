@@ -42,14 +42,16 @@ big_integer::big_integer(const std::string &str) {
         return;
     }
     size_t i = 0;
+    int tsign = 1;
     if (str[0] == '-') {
-        sign = -1;
+        tsign = -1;
         i = 1;
     }
     for (; i < str.size(); i++) {
         *this *= 10;
         *this += str[i] - '0';
     }
+    sign = tsign;
 }
 
 big_integer &big_integer::operator=(const big_integer &other) {
@@ -82,6 +84,7 @@ big_integer &big_integer::operator+=(const big_integer &other) {
     } else {
         (sign == -1 ? *this = other - (-*this) : *this -= -other);
     }
+    shrink_to_fit();
     return *this;
 }
 
@@ -113,6 +116,7 @@ big_integer &big_integer::operator-=(const big_integer &other) {
     } else {
         *this += -other;
     }
+    shrink_to_fit();
     return *this;
 }
 
@@ -216,7 +220,8 @@ big_integer &big_integer::operator/=(const big_integer &other) {
     big_integer b = other;
     big_integer tmp;
     big_integer dq;
-    a.sign = b.sign = false;
+    a.sign = 1;
+    b.sign = 1;
     if (a < b) {
         *this = 0;
         return *this;
@@ -342,6 +347,7 @@ big_integer b_op(const big_integer &a, const big_integer &b, uint32_t (*f)(uint3
     size_t max_size = std::max(a.size(), b.size());
     x.add_up(max_size);
     y.add_up(max_size);
+    ans.add_up(max_size);
     for (size_t i = 0; i < max_size; i++) {
         ans.val[i] = (*f)(x.val[i], y.val[i]);
     }
@@ -411,22 +417,27 @@ big_integer operator*(big_integer a, const big_integer &b) {
 }
 
 big_integer operator>>(big_integer a, int value) {
+    if (value < 0) return a << -value;
+    a /= static_cast<uint32_t>(1) << (value % 32);
+    reverse(a.val.begin(), a.val.end());
     for (int i = 0; i < value / 32 && a.size(); i++) {
         a.val.pop_back();
     }
-    value %= 32;
+    reverse(a.val.begin(), a.val.end());
     if (a.sign == -1) {
-        a -= static_cast<uint32_t>(1 << value) - 1;
+        return a - 1;
     }
-    a /= static_cast<uint32_t>(1 << value);
     return a;
 }
 
 big_integer operator<<(big_integer a, int value) {
-    a *= static_cast<uint32_t>(1 << value % 32);
+    if (value < 0) return a >> -value;
+    a *= (static_cast<uint32_t>(1) << (value % 32));
+    reverse(a.val.begin(), a.val.end());
     for (int i = 0; i < value / 32; i++) {
         a.val.push_back(0);
     }
+    reverse(a.val.begin(), a.val.end());
     return a;
 }
 
