@@ -62,12 +62,14 @@ struct vector {
 private:
     size_t increase_capacity() const;
 
+    void del_data();
+
+    T *create_data(size_t size);
+
 private:
     T *data_;
     size_t size_;
     size_t capacity_;
-
-    void del_data() const;
 };
 
 template<typename T>
@@ -77,7 +79,7 @@ template<typename T>
 vector<T>::vector(const vector &other) : vector() {
     T *new_data = nullptr;
     if (other.size_ > 0) {
-        new_data = static_cast<T *>(operator new(other.size_ * sizeof(T)));
+        new_data = create_data(other.size_);
     }
     size_t i = 0;
     try {
@@ -185,7 +187,7 @@ template<typename T>
 void vector<T>::reserve(size_t len) {
     if (len > capacity_) {
         vector<T> temp;
-        temp.data_ = static_cast<T *>(operator new(len * sizeof(T)));
+        temp.data_ = create_data(len);
         temp.capacity_ = len;
         for (size_t i = 0; i < size_; i++) {
             temp.push_back(data_[i]);
@@ -217,7 +219,7 @@ void vector<T>::shrink_to_fit() {
     }
     T *new_data = nullptr;
     if (size_ > 0) {
-        new_data = static_cast<T *>(operator new(size_ * sizeof(T)));
+        new_data = create_data(size_);
     }
     for (size_t i = 0; i < size_; i++) {
         new(new_data + i) T(data_[i]);
@@ -237,10 +239,15 @@ void vector<T>::clear() {
 }
 
 template<typename T>
-void vector<T>::del_data() const {
+void vector<T>::del_data() {
     for (size_t i = size_; i != 0; i--) {
         data_[i - 1].~T();
     }
+}
+
+template<typename T>
+T* vector<T>::create_data(size_t size) {
+    return static_cast<T *>(operator new(size * sizeof(T)));
 }
 
 template<typename T>
@@ -299,7 +306,6 @@ typename vector<T>::const_iterator vector<T>::begin() const {
 template<typename T>
 typename vector<T>::const_iterator vector<T>::end() const {
     return data_ + size_;
-
 }
 
 #endif //VECTOR_H
