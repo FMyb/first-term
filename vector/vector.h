@@ -45,21 +45,13 @@ struct vector {
 
     void swap(vector &);                     // O(1) nothrow
 
-    iterator begin() {
-        return data_;
-    }                                        // O(1) nothrow
+    iterator begin();                        // O(1) nothrow
 
-    iterator end() {
-        return data_ + size_;
-    }                                        // O(1) nothrow
+    iterator end();                          // O(1) nothrow
 
-    const_iterator begin() const {           // O(1) nothrow
-        return data_;
-    }
+    const_iterator begin() const;            // O(1) nothrow
 
-    const_iterator end() const {             // O(1) nothrow
-        return data_ + size_;
-    }
+    const_iterator end() const;             // O(1) nothrow
 
     iterator insert(const_iterator pos, T const &); // O(N) weak
 
@@ -70,20 +62,16 @@ struct vector {
 private:
     size_t increase_capacity() const;
 
-    void push_back_realloc(T const &);
-
 private:
     T *data_;
     size_t size_;
     size_t capacity_;
+
+    void del_data() const;
 };
 
 template<typename T>
-vector<T>::vector() {
-    size_ = 0;
-    capacity_ = 0;
-    data_ = nullptr;
-}
+vector<T>::vector(): data_(nullptr), size_(0), capacity_(0) {}
 
 template<typename T>
 vector<T>::vector(const vector &other) : vector() {
@@ -125,9 +113,7 @@ void vector<T>::swap(vector &other) {
 
 template<typename T>
 vector<T>::~vector() {
-    for (size_t i = 0; i < size_; i++) {
-        data_[i].~T();
-    }
+    del_data();
     operator delete(data_);
 }
 
@@ -183,24 +169,16 @@ void vector<T>::push_back(const T &value) {
     if (size_ < capacity_) {
         new(data_ + size_) T(value);
     } else {
-        push_back_realloc(value);
+        T tmp(value);
+        reserve(increase_capacity());
+        new(data_ + size_) T(tmp);
     }
     size_++;
 }
 
 template<typename T>
 size_t vector<T>::increase_capacity() const {
-    if (capacity_ == 0) {
-        return 1;
-    }
-    return 2 * capacity_;
-}
-
-template<typename T>
-void vector<T>::push_back_realloc(const T &value) {
-    T tmp(value);
-    reserve(increase_capacity());
-    new(data_ + size_) T(tmp);
+    return capacity_ == 0 ? 1 : 2 * capacity_;
 }
 
 template<typename T>
@@ -244,9 +222,7 @@ void vector<T>::shrink_to_fit() {
     for (size_t i = 0; i < size_; i++) {
         new(new_data + i) T(data_[i]);
     }
-    for (size_t i = 0; i < size_; i++) {
-        data_[i].~T();
-    }
+    del_data();
     size_t temp_size = size_;
     operator delete(data_);  // MB BUG
     data_ = new_data;
@@ -256,10 +232,15 @@ void vector<T>::shrink_to_fit() {
 
 template<typename T>
 void vector<T>::clear() {
-    for (size_t i = 0; i < size_; i++) {
-        data_[i].~T();
-    }
+    del_data();
     size_ = 0;
+}
+
+template<typename T>
+void vector<T>::del_data() const {
+    for (size_t i = size_; i != 0; i--) {
+        data_[i - 1].~T();
+    }
 }
 
 template<typename T>
@@ -276,7 +257,6 @@ typename vector<T>::iterator vector<T>::insert(vector::const_iterator pos, const
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator pos) {
     iterator it = (pos - begin()) + begin();
-    iterator ret = it + 1;
     while (it + 1 != end()) {
         std::swap(*it, *(it + 1));
         ++it;
@@ -287,16 +267,39 @@ typename vector<T>::iterator vector<T>::erase(vector::const_iterator pos) {
 
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator first, vector::const_iterator last) {
-    vector new_data;
-    for (size_t i = 0; begin() + i != first; i++) {
-        new_data.push_back(data_[i]);
+    if (first > last) {
+        return (first - begin()) + begin();
     }
-    iterator ret = new_data.end();
-    for (size_t i = last - begin(); begin() + i != end(); i++) {
-        new_data.push_back(data_[i]);
+    std::ptrdiff_t sz = last - first;
+    for (std::ptrdiff_t i = first - begin(); i < size_ - sz; i++) {
+        data_[i] = data_[i + sz];
     }
-    swap(new_data);
-    return ret;
+    for (std::ptrdiff_t i = 0; i < sz; i++) {
+        pop_back();
+    }
+
+    return (first - begin()) + begin();
+}
+
+template<typename T>
+typename vector<T>::iterator vector<T>::begin() {
+    return data_;
+}
+
+template<typename T>
+typename vector<T>::iterator vector<T>::end() {
+    return data_ + size_;
+}
+
+template<typename T>
+typename vector<T>::const_iterator vector<T>::begin() const {
+    return data_;
+}
+
+template<typename T>
+typename vector<T>::const_iterator vector<T>::end() const {
+    return data_ + size_;
+
 }
 
 #endif //VECTOR_H
