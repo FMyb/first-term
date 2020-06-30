@@ -89,7 +89,7 @@ big_integer &big_integer::operator+=(const big_integer &other) {
 }
 
 big_integer &big_integer::operator-=(const big_integer &other) {
-    if (other.sign == 1) {
+    if (other.sign == 1 || other == 0) {
         if (*this < other) {
             *this = -(other - *this);
             return *this;
