@@ -176,17 +176,29 @@ bool operator==(const big_integer &a, const big_integer &b) {
     }
 }
 
+uint32_t trial(big_integer const &a, big_integer const &b) {
+    uint128_t t1 = (((uint128_t) a.val[a.size() - 1]) << 64) + (((uint128_t) a.val[a.size() - 2]) << 32) +
+                   ((uint128_t) a.val[a.size() - 3]);
+    uint128_t t2 = (((uint128_t) b.val[b.size() - 1]) << 32) + b.val[b.size() - 2];
+    return std::min((uint32_t) (t1 / t2), UINT32_MAX);
+}
 
-void difference(big_integer &a, big_integer const &b, size_t index) {
-    size_t start = a.size() - index;
-    bool borrow = false;
-    for (size_t i = 0; i < index; ++i) {
-        uint32_t x = a.val[start + i];
-        uint32_t y = (i < b.size() ? b.val[i] : 0);
-        uint64_t c = static_cast<uint64_t> (x - y - borrow);
-        borrow = (y + borrow > x);
-        c %= (1LL << 32);
-        a.val[start + i] = static_cast<uint32_t> (c);
+bool smaller(big_integer const &a, big_integer const &b, uint32_t k) {
+    for (size_t i = 1; i <= a.size(); i++) {
+        uint32_t tmp = k - i < b.size() ? b.val[k - i] : 0;
+        if (a.val[a.size() - i] != tmp) {
+            return a.val[a.size() - i] < tmp;
+        }
+    }
+    return false;
+}
+
+void difference(big_integer &a, big_integer const &b, size_t k) {
+    int borrow = 0;
+    for (size_t i = 0; i < a.size() - k; i++) {
+        uint32_t diff = a.val[i + k] - (i < b.size() ? b.val[i] : 0) - borrow;
+        borrow = ((i < b.size() ? b.val[i] : 0) + borrow > a.val[i + k]);
+        a.val[i + k] = static_cast<uint32_t> (diff % (1LL << 32));
     }
 }
 
@@ -205,21 +217,10 @@ big_integer div_bi_short(big_integer &a, uint32_t b) {
 }
 
 
-bool smaller(big_integer const &a, big_integer const &b, size_t ind) {
-    for (size_t i = 1; i <= a.size(); i++) {
-        uint32_t tmp = ind - i < b.size() ? b.val[ind - i] : 0;
-        if (a.val[a.size() - i] != tmp) {
-            return a.val[a.size() - i] > tmp;
-        }
-    }
-    return true;
-}
-
 big_integer &big_integer::operator/=(const big_integer &other) {
     big_integer a = *this;
     big_integer b = other;
-    big_integer tmp;
-    big_integer dq;
+    big_integer x;
     a.sign = 1;
     b.sign = 1;
     if (a < b) {
@@ -227,37 +228,33 @@ big_integer &big_integer::operator/=(const big_integer &other) {
         return *this;
     }
     if (b.size() == 1) {
-        tmp = div_bi_short(a, b.val[0]);
-        tmp.sign = sign * other.sign;
-        *this = tmp;
+        x = div_bi_short(a, b.val[0]);
+        x.sign = sign * other.sign;
+        *this = x;
         return *this;
     }
     a.val.push_back(0);
-    size_t m = b.size() + 1;
     size_t n = a.size();
-    tmp.val.resize(n - m + 1);
-    uint32_t qt = 0;
-    for (size_t i = m, j = tmp.val.size() - 1; i <= n; ++i, --j) {
-        uint128_t x = ((static_cast<uint128_t> (a.val[a.size() - 1]) << 64) |
-                       (static_cast<uint128_t> (a.val[a.size() - 2]) << 32) |
-                       (static_cast<uint128_t> (a.val[a.size() - 3])));
-        uint128_t y = ((static_cast<uint128_t> (b.val[b.size() - 1]) << 32) |
-                       static_cast<uint128_t> (b.val[b.size() - 2]));
-        qt = std::min(static_cast<uint32_t> ((x / y)), UINT32_MAX);
-        dq = b * qt;
-        if (!smaller(a, dq, m)) {
+    size_t m = b.size() + 1;
+    x.val.resize(n - m + 2);
+    for (size_t k = n - m + 1; k != 0; k--) {
+        uint32_t qt = trial(a, b);
+        big_integer dq = b * qt;
+        dq.val.push_back(0);
+        if (smaller(a, dq, m)) {
             qt--;
             dq -= b;
         }
-        tmp.val[j] = qt;
-        difference(a, dq, m);
+        x.val[k - 1] = qt;
+        difference(a, dq, a.size() - m);
         if (!a.val.back()) a.val.pop_back();
     }
-    tmp.shrink_to_fit();
-    tmp.sign = sign * other.sign;
-    *this = tmp;
+    x.shrink_to_fit();
+    x.sign = sign * other.sign;
+    *this = x;
     return *this;
 }
+
 
 bool operator!=(const big_integer &a, const big_integer &b) {
     return !(a == b);
