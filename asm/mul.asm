@@ -109,6 +109,13 @@ mul_long_short:
                 pop             rax
                 ret
 
+
+; multiplies long number by a short
+;    rdi -- address of multiplier #1 (long number)
+;    rbx -- multiplier #2 (64-bit unsigned)
+;    rcx -- length of long number in qwords
+; result:
+;    product is written to r9
 mul_long_short_for_mul_long_long:
                 push            rax
                 push            rdi
@@ -139,6 +146,13 @@ mul_long_short_for_mul_long_long:
                 ret
 
 
+
+; adds two long number
+;    r8 -- address of summand #1 (long number)
+;    r9 -- address of summand #2 (long number)
+;    rcx -- length of long numbers in qwords
+; result:
+;    sum is written to r8
 add_long_long_for_mul_long_long:
                 push            r8
                 push            r9
@@ -159,7 +173,12 @@ add_long_long_for_mul_long_long:
                 pop             r8
                 ret
 
-
+; multiplies long number by a long
+;    rdi -- address of multiplier #1 (long number)
+;    rsi -- address of multiplier #2 (long number)
+;    r10 -- length of long number in qwords
+; result:
+;    product is written to r8
 mul_long_long:
                 push            rdi
                 push            rsi
