@@ -59,12 +59,13 @@ struct vector {
 
     iterator erase(const_iterator first, const_iterator last); // O(N) weak
 
+    static void del_data(size_t, T *data);
+
+    static T *copy_data(size_t size, size_t capacity, T *other_data);
+
 private:
+
     size_t increase_capacity() const;
-
-    void del_data();
-
-    T *create_data(size_t size);
 
 private:
     T *data_;
@@ -77,22 +78,7 @@ vector<T>::vector(): data_(nullptr), size_(0), capacity_(0) {}
 
 template<typename T>
 vector<T>::vector(const vector &other) : vector() {
-    T *new_data = nullptr;
-    if (other.size_ > 0) {
-        new_data = create_data(other.size_);
-    }
-    size_t i = 0;
-    try {
-        for (; i < other.size_; i++) {
-            new(new_data + i) T(other.data_[i]);
-        }
-    } catch (...) {
-        for (; i != 0; i--) {
-            new_data[i - 1].~T();
-        }
-        operator delete(new_data);
-        throw;
-    }
+    T *new_data = copy_data(other.size_, other.size_, other.data_);
     data_ = new_data;
     size_ = other.size_;
     capacity_ = other.size_;
@@ -115,7 +101,7 @@ void vector<T>::swap(vector &other) {
 
 template<typename T>
 vector<T>::~vector() {
-    del_data();
+    del_data(size_, data_);
     operator delete(data_);
 }
 
@@ -186,13 +172,13 @@ size_t vector<T>::increase_capacity() const {
 template<typename T>
 void vector<T>::reserve(size_t len) {
     if (len > capacity_) {
-        vector<T> temp;
-        temp.data_ = create_data(len);
-        temp.capacity_ = len;
-        for (size_t i = 0; i < size_; i++) {
-            temp.push_back(data_[i]);
-        }
-        swap(temp);
+        T *new_data = copy_data(size_, len, data_);
+        del_data(size_, data_);
+        size_t temp_size = size_;
+        operator delete(data_);
+        data_ = new_data;
+        size_ = temp_size;
+        capacity_ = len;
     }
 }
 
@@ -217,14 +203,8 @@ void vector<T>::shrink_to_fit() {
     if (capacity_ == size_) {
         return;
     }
-    T *new_data = nullptr;
-    if (size_ > 0) {
-        new_data = create_data(size_);
-    }
-    for (size_t i = 0; i < size_; i++) {
-        new(new_data + i) T(data_[i]);
-    }
-    del_data();
+    T *new_data = copy_data(size_, size_, data_);
+    del_data(size_, data_);
     size_t temp_size = size_;
     operator delete(data_);  // MB BUG
     data_ = new_data;
@@ -234,20 +214,37 @@ void vector<T>::shrink_to_fit() {
 
 template<typename T>
 void vector<T>::clear() {
-    del_data();
+    del_data(size_, data_);
     size_ = 0;
 }
 
 template<typename T>
-void vector<T>::del_data() {
-    for (size_t i = size_; i != 0; i--) {
-        data_[i - 1].~T();
+void vector<T>::del_data(size_t size, T *data) {
+    for (size_t i = size; i != 0; i--) {
+        data[i - 1].~T();
     }
 }
 
 template<typename T>
-T* vector<T>::create_data(size_t size) {
-    return static_cast<T *>(operator new(size * sizeof(T)));
+T *vector<T>::copy_data(size_t size, size_t capacity, T *other_data) {
+    if (capacity < size) {
+        capacity = size;
+    }
+    T *new_data = nullptr;
+    if (capacity > 0) {
+        new_data = static_cast<T *>(operator new(capacity * sizeof(T)));
+    }
+    size_t i = 0;
+    try {
+        for (; i < size; i++) {
+            new(new_data + i) T(other_data[i]);
+        }
+    } catch (...) {
+        del_data(i, new_data);
+        operator delete(new_data);
+        throw;
+    }
+    return new_data;
 }
 
 template<typename T>
@@ -263,29 +260,24 @@ typename vector<T>::iterator vector<T>::insert(vector::const_iterator pos, const
 
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator pos) {
-    iterator it = (pos - begin()) + begin();
-    while (it + 1 != end()) {
-        std::swap(*it, *(it + 1));
-        ++it;
-    }
-    pop_back();
-    return data_ + (it - begin());
+    return erase(pos, pos + 1);
 }
 
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator first, vector::const_iterator last) {
+    auto fst = first - begin();
     if (first > last) {
-        return (first - begin()) + begin();
+        return fst + begin();
     }
     std::ptrdiff_t sz = last - first;
-    for (std::ptrdiff_t i = first - begin(); i < size_ - sz; i++) {
+    for (std::ptrdiff_t i = fst; i < size_ - sz; i++) {
         data_[i] = data_[i + sz];
     }
     for (std::ptrdiff_t i = 0; i < sz; i++) {
         pop_back();
     }
 
-    return (first - begin()) + begin();
+    return fst + begin();
 }
 
 template<typename T>
