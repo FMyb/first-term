@@ -85,11 +85,13 @@ private:
 
     void shrink_to_fit();
 
-    friend big_integer div_bi_short(big_integer &, uint32_t);
+    friend uint32_t trial(big_integer const &, big_integer const &);
 
     friend void difference(big_integer &, big_integer const &, size_t);
 
-    friend bool smaller(big_integer const &, big_integer const &, size_t);
+    friend big_integer div_bi_short(big_integer &, uint32_t);
+
+    friend bool smaller(big_integer const &, big_integer const &, uint32_t);
 
     friend big_integer b_op(big_integer const &, big_integer const &, uint32_t (*f)(uint32_t, uint32_t));
 
