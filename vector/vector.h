@@ -59,9 +59,9 @@ struct vector {
 
     iterator erase(const_iterator first, const_iterator last); // O(N) weak
 
-    static void del_data(size_t, T *data);
+    static void clear_data(T *data, size_t);
 
-    static T *copy_data(size_t size, size_t capacity, T *other_data);
+    static T *copy_data(T *other_data, size_t size, size_t capacity);
 
 private:
 
@@ -78,8 +78,7 @@ vector<T>::vector(): data_(nullptr), size_(0), capacity_(0) {}
 
 template<typename T>
 vector<T>::vector(const vector &other) : vector() {
-    T *new_data = copy_data(other.size_, other.size_, other.data_);
-    data_ = new_data;
+    data_ = copy_data(other.data_, other.size_, other.size_);
     size_ = other.size_;
     capacity_ = other.size_;
 }
@@ -101,7 +100,7 @@ void vector<T>::swap(vector &other) {
 
 template<typename T>
 vector<T>::~vector() {
-    del_data(size_, data_);
+    clear_data(data_, size_);
     operator delete(data_);
 }
 
@@ -172,12 +171,10 @@ size_t vector<T>::increase_capacity() const {
 template<typename T>
 void vector<T>::reserve(size_t len) {
     if (len > capacity_) {
-        T *new_data = copy_data(size_, len, data_);
-        del_data(size_, data_);
-        size_t temp_size = size_;
+        T *new_data = copy_data(data_, size_, len);
+        clear_data(data_, size_);
         operator delete(data_);
         data_ = new_data;
-        size_ = temp_size;
         capacity_ = len;
     }
 }
@@ -203,30 +200,28 @@ void vector<T>::shrink_to_fit() {
     if (capacity_ == size_) {
         return;
     }
-    T *new_data = copy_data(size_, size_, data_);
-    del_data(size_, data_);
-    size_t temp_size = size_;
+    T *new_data = copy_data(data_, size_, size_);
+    clear_data(data_, size_);
     operator delete(data_);  // MB BUG
     data_ = new_data;
-    capacity_ = temp_size;
-    size_ = temp_size;
+    capacity_ = size_;
 }
 
 template<typename T>
 void vector<T>::clear() {
-    del_data(size_, data_);
+    clear_data(data_, size_);
     size_ = 0;
 }
 
 template<typename T>
-void vector<T>::del_data(size_t size, T *data) {
+void vector<T>::clear_data(T *data, size_t size) {
     for (size_t i = size; i != 0; i--) {
         data[i - 1].~T();
     }
 }
 
 template<typename T>
-T *vector<T>::copy_data(size_t size, size_t capacity, T *other_data) {
+T *vector<T>::copy_data(T *other_data, size_t size, size_t capacity) {
     if (capacity < size) {
         capacity = size;
     }
@@ -240,7 +235,7 @@ T *vector<T>::copy_data(size_t size, size_t capacity, T *other_data) {
             new(new_data + i) T(other_data[i]);
         }
     } catch (...) {
-        del_data(i, new_data);
+        clear_data(new_data, i);
         operator delete(new_data);
         throw;
     }
