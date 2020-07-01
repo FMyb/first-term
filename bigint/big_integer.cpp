@@ -140,7 +140,7 @@ big_integer &big_integer::operator*=(const big_integer &other) {
     for (size_t i = 0; i < size(); i++) {
         uint32_t cur = 0;
         for (size_t j = 0; j < other.size(); j++) {
-            uint64_t temp = (uint64_t) val[i] * other.val[j] + res.val[i + j] + cur;
+            uint64_t temp = static_cast<uint64_t>(val[i]) * other.val[j] + res.val[i + j] + cur;
             res.val[i + j] = static_cast<uint32_t> ((temp % (1LL << 32)));
             cur = static_cast<uint32_t> (temp / (1LL << 32));
         }
@@ -177,10 +177,11 @@ bool operator==(const big_integer &a, const big_integer &b) {
 }
 
 uint32_t trial(big_integer const &a, big_integer const &b) {
-    uint128_t t1 = (((uint128_t) a.val[a.size() - 1]) << 64) + (((uint128_t) a.val[a.size() - 2]) << 32) +
-                   ((uint128_t) a.val[a.size() - 3]);
-    uint128_t t2 = (((uint128_t) b.val[b.size() - 1]) << 32) + b.val[b.size() - 2];
-    return std::min((uint32_t) (t1 / t2), UINT32_MAX);
+    uint128_t t1 =
+            (static_cast<uint128_t>(a.val[a.size() - 1]) << 64) + (static_cast<uint128_t>(a.val[a.size() - 2]) << 32) +
+            static_cast<uint128_t>(a.val[a.size() - 3]);
+    uint128_t t2 = (static_cast<uint128_t>(b.val[b.size() - 1]) << 32) + b.val[b.size() - 2];
+    return std::min(static_cast<uint32_t>(t1 / t2), UINT32_MAX);
 }
 
 bool smaller(big_integer const &a, big_integer const &b, uint32_t k) {
