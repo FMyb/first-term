@@ -4,12 +4,13 @@
 _start:
 
                 sub             rsp, 2 * 128 * 8
-                lea             rdi, [rsp + 128 * 8]
+                lea             rdi, [rsp]
                 mov             rcx, 128
                 call            read_long
-                mov             rdi, rsp
+                lea             rdi, [rsp + 128 * 8]
                 call            read_long
                 lea             rsi, [rsp + 128 * 8]
+                mov             rdi, rsp
                 call            sub_long_long
 
                 call            write_long
@@ -52,11 +53,6 @@ add_long_long:
 ;   difference is written to rdi
 
 sub_long_long:
-                mov             r8, rdi
-                mov             rdi, rsi
-                mov             rsi, r8
-                xor             r8, r8
-
                 push            rdi
                 push            rsi
                 push            rcx
