@@ -5,8 +5,9 @@
 #include "big_integer.h"
 #include <climits>
 #include <algorithm>
+#include <stdexcept>
 
-big_integer::big_integer(int value) {
+big_integer::big_integer(int value) : sign(value >= 0 ? 1 : -1) {
     uint32_t tmp;
     if (value < 0) {
         if (value == INT_MIN) {
@@ -18,7 +19,6 @@ big_integer::big_integer(int value) {
         tmp = value;
     }
     val = uint_vector(1, tmp);
-    sign = value >= 0 ? 1 : -1;
 }
 
 big_integer::big_integer(uint32_t value) {
@@ -31,9 +31,8 @@ big_integer::big_integer() {
     sign = 1;
 }
 
-big_integer::big_integer(const std::string &str) {
-    *this = big_integer();
-    if (str == "0") {
+big_integer::big_integer(const std::string &str) : big_integer() {
+    if (str == "0" || str.empty()) {
         return;
     }
     size_t i = 0;
@@ -48,7 +47,7 @@ big_integer::big_integer(const std::string &str) {
     }
     for (; i < str.size(); i++) {
         if (!(str[i] >= '0' && str[i] <= '9')) {
-            throw;
+            throw std::invalid_argument("expected digit, found not digit at pos:" + std::to_string(i));
         }
         *this *= 10;
         *this += str[i] - '0';
