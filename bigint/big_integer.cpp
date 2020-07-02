@@ -17,7 +17,7 @@ big_integer::big_integer(int value) {
     } else {
         tmp = value;
     }
-    val = std::vector<uint32_t>(1, tmp);
+    val = {tmp};
     sign = value >= 0 ? 1 : -1;
 }
 
@@ -31,13 +31,8 @@ big_integer::big_integer() {
     sign = 1;
 }
 
-
-big_integer::~big_integer() {
-    val.clear(); // TODO
-}
-
 big_integer::big_integer(const std::string &str) {
-    *this = big_integer(0);
+    *this = big_integer();
     if (str == "0") {
         return;
     }
@@ -47,7 +42,14 @@ big_integer::big_integer(const std::string &str) {
         tsign = -1;
         i = 1;
     }
+    if (str[0] == '+') {
+        tsign = 1;
+        i = 1;
+    }
     for (; i < str.size(); i++) {
+        if (!(str[i] >= '0' && str[i] <= '9')) {
+            throw;
+        }
         *this *= 10;
         *this += str[i] - '0';
     }
@@ -219,18 +221,22 @@ big_integer div_bi_short(big_integer &a, uint32_t b) {
 
 
 big_integer &big_integer::operator/=(const big_integer &other) {
+    int ans_sign = sign * other.sign;
+    int tmp = sign;
+    sign = other.sign;
+    if ((sign == 1 && *this < other) || (sign == -1 && *this > other)) {
+        *this = 0;
+        return *this;
+    }
+    sign = tmp;
     big_integer a = *this;
     big_integer b = other;
     big_integer x;
     a.sign = 1;
     b.sign = 1;
-    if (a < b) {
-        *this = 0;
-        return *this;
-    }
     if (b.size() == 1) {
         x = div_bi_short(a, b.val[0]);
-        x.sign = sign * other.sign;
+        x.sign = ans_sign;
         *this = x;
         return *this;
     }
@@ -251,7 +257,7 @@ big_integer &big_integer::operator/=(const big_integer &other) {
         if (!a.val.back()) a.val.pop_back();
     }
     x.shrink_to_fit();
-    x.sign = sign * other.sign;
+    x.sign = ans_sign;
     *this = x;
     return *this;
 }
@@ -338,21 +344,30 @@ uint32_t b_xor(uint32_t a, uint32_t b) {
     return a ^ b;
 }
 
+void calc_func(const big_integer &a, const big_integer &b, big_integer &ans, uint32_t (*f)(uint32_t, uint32_t)) {
+    for (size_t i = 0; i < a.size(); i++) {
+        ans.val[i] = (*f)(a.val[i], b.val[i]);
+    }
+}
+
 big_integer b_op(const big_integer &a, const big_integer &b, uint32_t (*f)(uint32_t, uint32_t)) {
-    big_integer x = a;
-    big_integer y = b;
-    big_integer ans;
     size_t max_size = std::max(a.size(), b.size());
-    x.add_up(max_size);
-    y.add_up(max_size);
+    big_integer ans;
     ans.add_up(max_size);
-    for (size_t i = 0; i < max_size; i++) {
-        ans.val[i] = (*f)(x.val[i], y.val[i]);
+    if (a.sign == 1 && b.sign == 1 && a.size() == b.size()) {
+        calc_func(a, b, ans, f);
+    } else {
+        big_integer x = a;
+        big_integer y = b;
+        x.add_up(max_size);
+        y.add_up(max_size);
+        ans.add_up(max_size);
+        calc_func(x, y, ans, f);
     }
     if ((*f)(static_cast<uint32_t>(a.sign == 1 ? 0 : 1), static_cast<uint32_t>(b.sign == 1 ? 0 : 1))) {
-        ans = -ans;
+        ans.sign = -ans.sign;
         ans.add_up(max_size);
-        ans = -ans;
+        ans.sign = -ans.sign;
     }
     return ans;
 }
@@ -418,7 +433,7 @@ big_integer operator>>(big_integer a, int value) {
     if (value < 0) return a << -value;
     a /= static_cast<uint32_t>(1) << (value % 32);
     reverse(a.val.begin(), a.val.end());
-    for (int i = 0; i < value / 32 && a.size(); i++) {
+    for (int i = 0; i < value / 32 && a.size() != 0; i++) {
         a.val.pop_back();
     }
     reverse(a.val.begin(), a.val.end());

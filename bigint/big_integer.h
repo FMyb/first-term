@@ -23,7 +23,7 @@ struct big_integer {
 
     explicit big_integer(std::string const &str);
 
-    ~big_integer();
+    ~big_integer() = default;
 
     big_integer &operator=(big_integer const &other);
 
@@ -94,6 +94,8 @@ private:
     friend bool smaller(big_integer const &, big_integer const &, uint32_t);
 
     friend big_integer b_op(big_integer const &, big_integer const &, uint32_t (*f)(uint32_t, uint32_t));
+
+    friend void calc_func(const big_integer &, const big_integer &, big_integer &, uint32_t (*f)(uint32_t, uint32_t));
 
     void add_up(size_t);
 
