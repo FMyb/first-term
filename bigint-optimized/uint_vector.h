@@ -30,7 +30,7 @@ struct uint_vector {
 
     uint_vector(size_t size) : uint_vector(size, 0) {}
 
-    uint_vector(size_t size, uint32_t init_val) : size_(size) {
+    uint_vector(size_t size, uint32_t init_val) : size_(size), small(size <= MAX_STATIC_SIZE) {
         if (size <= MAX_STATIC_SIZE) {
             std::fill(static_data, static_data + size, init_val);
         } else {
@@ -38,7 +38,7 @@ struct uint_vector {
         }
     }
 
-    uint_vector(uint_vector const &other) :size_(other.size_) {
+    uint_vector(uint_vector const &other) : size_(other.size_), small(other.small) {
         if (is_small()) {
             std::copy_n(other.static_data, other.size_, static_data);
         } else {
@@ -48,22 +48,18 @@ struct uint_vector {
     }
 
     ~uint_vector() {
-        if (is_small()) {
-            for (size_t i = 0; i < size_; i++) {
-                static_data[i].~uint32_t();
-            }
-        } else {
+        if (!is_small()) {
             dynamic_data->ref_cnt--;
             if (dynamic_data->ref_cnt == 0) {
                 delete dynamic_data;
             }
-
         }
     }
 
     uint_vector &operator=(uint_vector const &other) {
         this->~uint_vector();
         size_ = other.size_;
+        small = other.small;
         if (is_small()) {
             std::copy_n(other.static_data, other.size_, static_data);
         } else {
@@ -77,28 +73,23 @@ struct uint_vector {
         if (size_ != other.size_) {
             return false;
         }
-        if (is_small()) {
-            for (size_t i = 0; i < size_; i++) {
-                if (static_data[i] != other.static_data[i]) {
-                    return false;
-                }
+        for (size_t i = 0; i < size_; i++) {
+            if (this->operator[](i) != other[i]) {
+                return false;
             }
-            return true;
         }
-        return dynamic_data->data == other.dynamic_data->data;
+        return true;
+
     }
 
     void push_back(uint32_t x) {
         if (is_small()) {
             if (size_ == MAX_STATIC_SIZE) {
-                std::vector<uint32_t> tmp(size_);
-                std::copy_n(static_data, size_, tmp.begin());
+                std::vector<uint32_t> tmp(static_data, static_data + size_);
                 tmp.push_back(x);
-                for (size_t i = 0; i < size_; i++) {
-                    static_data[i].~uint32_t();
-                }
                 dynamic_data = new dynamic_buffer(tmp);
                 size_++;
+                small = false;
             } else {
                 static_data[size_++] = x;
             }
@@ -115,14 +106,7 @@ struct uint_vector {
         } else {
             unshare();
             dynamic_data->data.pop_back();
-            if (size_ - 1 == MAX_STATIC_SIZE) {
-                std::vector<uint32_t> tmp(dynamic_data->data);
-                this->~uint_vector();
-                size_ = MAX_STATIC_SIZE;
-                std::copy_n(tmp.begin(), size_, static_data);
-            } else {
-                size_--;
-            }
+            size_--;
         }
     }
 
@@ -152,13 +136,21 @@ struct uint_vector {
         if (is_small()) {
             std::reverse(static_data, static_data + size_);
         } else {
+            unshare();
             std::reverse(dynamic_data->data.begin(), dynamic_data->data.end());
         }
     }
 
     void assign(size_t size, uint32_t x) {
-        uint_vector tmp(size, x);
-        swap(tmp);
+        this->~uint_vector();
+        size_ = size;
+        if (size <= MAX_STATIC_SIZE) {
+            small = true;
+            std::fill(static_data, static_data + size, x);
+        } else {
+            small = false;
+            dynamic_data = new dynamic_buffer(std::vector<uint32_t>(size, x));
+        }
     }
 
     void swap(uint_vector &other) {
@@ -173,12 +165,13 @@ struct uint_vector {
 
 
 private:
-    static size_t const MAX_STATIC_SIZE = sizeof(dynamic_buffer);
+    static size_t constexpr MAX_STATIC_SIZE = sizeof(dynamic_buffer*) / sizeof(uint32_t);
 
     size_t size_;
+    bool small;
 
     bool is_small() const {
-        return size_ <= MAX_STATIC_SIZE;
+        return small;
     }
 
     union {
