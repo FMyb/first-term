@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+static const uint32_t MAX_DEG = 32;
+
 big_integer::big_integer(int value) : sign(value >= 0 ? 1 : -1) {
     uint32_t tmp;
     if (value < 0) {
@@ -21,15 +23,9 @@ big_integer::big_integer(int value) : sign(value >= 0 ? 1 : -1) {
     val = uint_vector(1, tmp);
 }
 
-big_integer::big_integer(uint32_t value) {
-    val = uint_vector(1, value);
-    sign = 1;
-}
+big_integer::big_integer(uint32_t value) : val(uint_vector(1, value)), sign(1) {}
 
-big_integer::big_integer() {
-    val = uint_vector(1, 0);
-    sign = 1;
-}
+big_integer::big_integer() : val(uint_vector(1, 0)), sign(1) {}
 
 big_integer::big_integer(const std::string &str) : big_integer() {
     if (str == "0" || str.empty()) {
@@ -78,7 +74,7 @@ big_integer &big_integer::operator+=(const big_integer &other) {
             if (i < other.size()) {
                 sum += other.val[i];
             }
-            cur = sum >> 32;
+            cur = sum >> MAX_DEG;
             res.val[i] = static_cast<uint32_t>(sum);
         }
         res.val[std::max(size(), other.size())] = static_cast<uint32_t>(cur);
@@ -108,8 +104,8 @@ big_integer &big_integer::operator-=(const big_integer &other) {
                 b = 1LL * other.val[i];
             }
             cur += 1LL * val[i] - b;
-            val[i] = static_cast<uint32_t>(cur + (1LL << 32));
-            cur = ((cur + (1LL << 32)) >> 32) - 1;
+            val[i] = static_cast<uint32_t>(cur + (1LL << MAX_DEG));
+            cur = ((cur + (1LL << MAX_DEG)) >> MAX_DEG) - 1;
         }
         if (cur != 0) {
             val.push_back(cur);
@@ -146,7 +142,7 @@ big_integer &big_integer::operator*=(const big_integer &other) {
         for (size_t j = 0; j < other.size(); j++) {
             uint64_t temp = static_cast<uint64_t>(val[i]) * other.val[j] + res.val[i + j] + cur;
             res.val[i + j] = static_cast<uint32_t> (temp);
-            cur = static_cast<uint32_t> (temp >> 32);
+            cur = static_cast<uint32_t> (temp >> MAX_DEG);
         }
         res.val[i + other.size()] += cur;
     }
@@ -177,10 +173,10 @@ bool operator==(const big_integer &a, const big_integer &b) {
 
 uint32_t trial(big_integer const &a, big_integer const &b) {
     uint128_t t1 =
-            (static_cast<uint128_t>(a.val[a.size() - 1]) << 64) + (static_cast<uint128_t>(a.val[a.size() - 2]) << 32) +
+            (static_cast<uint128_t>(a.val[a.size() - 1]) << (MAX_DEG * 2)) + (static_cast<uint128_t>(a.val[a.size() - 2]) << MAX_DEG) +
             static_cast<uint128_t>(a.val[a.size() - 3]);
-    uint128_t t2 = (static_cast<uint128_t>(b.val[b.size() - 1]) << 32) + b.val[b.size() - 2];
-    return std::min(static_cast<uint32_t>(t1 / t2), UINT32_MAX);
+    uint128_t t2 = (static_cast<uint128_t>(b.val[b.size() - 1]) << MAX_DEG) + b.val[b.size() - 2];
+    return static_cast<uint32_t>(t1 / t2);
 }
 
 bool smaller(big_integer const &a, big_integer const &b, uint32_t k) {
@@ -210,7 +206,7 @@ big_integer div_bi_short(big_integer &a, uint32_t b) {
     ans.val.assign(a.size(), 0);
     uint64_t cur = 0;
     for (size_t i = 0; i < a.size(); i++) {
-        uint64_t temp = (cur << 32) | a.val[a.size() - 1 - i];
+        uint64_t temp = (cur << MAX_DEG) | a.val[a.size() - 1 - i];
         ans.val[i] = static_cast<uint32_t>((temp / b));
         cur = temp % b;
     }
@@ -405,9 +401,9 @@ big_integer &big_integer::operator>>=(int value) {
         *this = *this << -value;
         return *this;
     }
-    *this /= static_cast<uint32_t>(1) << (value % 32);
+    *this /= static_cast<uint32_t>(1) << (value % MAX_DEG);
     val.reverse();
-    for (int i = 0; i < value / 32 && size() != 0; i++) {
+    for (int i = 0; i < value / MAX_DEG && size() != 0; i++) {
         val.pop_back();
     }
     val.reverse();
@@ -422,9 +418,9 @@ big_integer &big_integer::operator<<=(int value) {
         *this = *this >> -value;
         return *this;
     }
-    *this *= (static_cast<uint32_t>(1) << (value % 32));
+    *this *= (static_cast<uint32_t>(1) << (value % MAX_DEG));
     val.reverse();
-    for (int i = 0; i < value / 32; i++) {
+    for (int i = 0; i < value / MAX_DEG; i++) {
         val.push_back(0);
     }
     val.reverse();
