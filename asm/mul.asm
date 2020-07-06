@@ -3,16 +3,16 @@
                 global          _start
 _start:
 
-                sub             rsp, 4 * 128 * 8 + 129 * 8
-                lea             rdi, [rsp + 128 * 8]
+                sub             rsp, 4 * 128 * 8
+                mov             rdi, rsp
                 mov             rcx, 128
                 call            read_long
-                mov             rdi, rsp
+                lea             rdi, [rsp + 128 * 8]
                 call            read_long
+                mov             rdi, rsp
                 lea             rsi, [rsp + 128 * 8]
 
                 lea             r8, [rsi + 128 * 8]
-                lea             r9, [r8 + 2 * 128 * 8]
                 mov             r10, 128
 
                 call            mul_long_long
@@ -25,34 +25,6 @@ _start:
                 call            write_char
 
                 jmp             exit
-
-; adds two long number
-;    rdi -- address of summand #1 (long number)
-;    rsi -- address of summand #2 (long number)
-;    rcx -- length of long numbers in qwords
-; result:
-;    sum is written to rdi
-add_long_long:
-                push            rdi
-                push            rsi
-                push            rcx
-
-
-                add             rcx, 1
-
-                clc
-.loop:
-                mov             rax, [rsi]
-                lea             rsi, [rsi + 8]
-                adc             [rdi], rax
-                lea             rdi, [rdi + 8]
-                dec             rcx
-                jnz             .loop
-
-                pop             rcx
-                pop             rsi
-                pop             rdi
-                ret
 
 
 ; adds 64-bit number to long number
@@ -81,34 +53,6 @@ add_long_short:
                 pop             rdi
                 ret
 
-; multiplies long number by a short
-;    rdi -- address of multiplier #1 (long number)
-;    rbx -- multiplier #2 (64-bit unsigned)
-;    rcx -- length of long number in qwords
-; result:
-;    product is written to rdi
-mul_long_short:
-                push            rax
-                push            rdi
-                push            rcx
-
-                xor             rsi, rsi
-.loop:
-                mov             rax, [rdi]
-                mul             rbx
-                add             rax, rsi
-                adc             rdx, 0
-                mov             [rdi], rax
-                add             rdi, 8
-                mov             rsi, rdx
-                dec             rcx
-                jnz             .loop
-
-                pop             rcx
-                pop             rdi
-                pop             rax
-                ret
-
 
 ; multiplies long number by a short
 ;    rdi -- address of multiplier #1 (long number)
@@ -116,7 +60,7 @@ mul_long_short:
 ;    rcx -- length of long number in qwords
 ; result:
 ;    product is written to r9 (full answer, can be longer than long number by one qword)
-mul_long_short_for_mul_long_long:
+mul_long_short:
                 push            rax
                 push            rdi
                 push            rcx
@@ -153,7 +97,7 @@ mul_long_short_for_mul_long_long:
 ;    rcx -- length of long numbers in qwords
 ; result:
 ;    sum is written to r8 (the length is longer than the length of the summand by one qword)
-add_long_long_for_mul_long_long:
+add_long_long:
                 push            r8
                 push            r9
                 push            rcx
@@ -184,20 +128,28 @@ mul_long_long:
                 push            rsi
                 push            r10
                 push            r8
-.loop:
+                push            r11
+
+                mov             r11, rsp
+                sub             rsp, 129 * 8
+                mov             r9, rsp
+
+.loop:gi
                 mov             rbx, [rsi]
-                call            mul_long_short_for_mul_long_long
-                
-                call            add_long_long_for_mul_long_long
+                call            mul_long_short
+
+                call            add_long_long
                 add             r8, 8
 
                 add             rsi, 8
                 dec             r10
                 jnz             .loop
 
+                mov             rsp, r11
+                pop             r11
                 pop             r8
                 pop             r10
-                pop             rsi 
+                pop             rsi
                 pop             rdi
                 ret
 
@@ -285,6 +237,7 @@ read_long:
 
                 sub             rax, '0'
                 mov             rbx, 10
+                mov             r9, rdi
                 call            mul_long_short
                 call            add_long_short
                 jmp             .loop
