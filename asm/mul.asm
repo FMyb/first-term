@@ -134,7 +134,7 @@ mul_long_long:
                 sub             rsp, 129 * 8
                 mov             r9, rsp
 
-.loop:gi
+.loop:
                 mov             rbx, [rsi]
                 call            mul_long_short
 
