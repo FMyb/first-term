@@ -102,7 +102,7 @@ struct uint_vector {
 
     void pop_back() {
         if (is_small()) {
-            static_data[--size_].~uint32_t();
+            size_--;
         } else {
             unshare();
             dynamic_data->data.pop_back();
