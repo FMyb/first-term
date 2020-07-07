@@ -48,6 +48,10 @@ struct uint_vector {
     }
 
     ~uint_vector() {
+        del_data();
+    }
+
+    void del_data() {
         if (!is_small()) {
             dynamic_data->ref_cnt--;
             if (dynamic_data->ref_cnt == 0) {
@@ -57,7 +61,7 @@ struct uint_vector {
     }
 
     uint_vector &operator=(uint_vector const &other) {
-        this->~uint_vector();
+        del_data();
         size_ = other.size_;
         small = other.small;
         if (is_small()) {
@@ -142,7 +146,7 @@ struct uint_vector {
     }
 
     void assign(size_t size, uint32_t x) {
-        this->~uint_vector();
+        del_data();
         size_ = size;
         if (size <= MAX_STATIC_SIZE) {
             small = true;
